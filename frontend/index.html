@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Smart Expense Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg-color: #f3f4f6;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+
+        .category-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Modals and Overlays */
+        .modal-overlay {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(4px);
+            position: fixed;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            width: 90%;
+            max-width: 400px;
+            transform: translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 2rem;
+            position: relative;
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            color: #9CA3AF;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: #4B5563;
+        }
+
+        /* Large DB Modal */
+        #dbModal .modal-content {
+            max-width: 900px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .table-container {
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        /* Mobile Responsive Table styling */
+        .responsive-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .responsive-table th {
+            background-color: #F9FAFB;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .responsive-table th,
+        .responsive-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #E5E7EB;
+            text-align: left;
+        }
+
+        /* Toast notification */
+        #toastContainer {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            background: white;
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transform: translateX(120%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            border-left-color: #EF4444;
+        }
+
+        .toast.success {
+            border-left-color: #10B981;
+        }
+
+        /* Micro-animations */
+        .btn-hover {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-hover:active {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 640px) {
+
+            /* Transform table to cards on mobile */
+            .responsive-table thead {
+                display: none;
+            }
+
+            .responsive-table tbody tr {
+                display: flex;
+                flex-direction: column;
+                margin-bottom: 1rem;
+                background: white;
+                border: 1px solid #E5E7EB;
+                border-radius: 0.75rem;
+                padding: 1rem;
+                box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            }
+
+            .responsive-table tbody td {
+                border: none;
+                padding: 0.5rem 0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .responsive-table tbody td::before {
+                content: attr(data-label);
+                font-weight: 500;
+                color: #6B7280;
+                margin-right: 1rem;
+            }
+
+            .responsive-table tbody td:last-child {
+                border-top: 1px dashed #E5E7EB;
+                margin-top: 0.5rem;
+                padding-top: 1rem;
+                justify-content: flex-end;
+            }
+        }
+    </style>
+</head>
+
+<body class="text-gray-800 antialiased selection:bg-indigo-200">
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer"></div>
+
+    <!-- MAIN CONTAINER -->
+    <div class="container mx-auto px-4 py-8 lg:py-12 max-w-7xl">
+
+        <!-- HEADER -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6 glass-panel p-6 rounded-2xl">
+            <div class="flex items-center gap-4">
+                <div
+                    class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                        </path>
+                    </svg>
+                </div>
+                <div>
+                    <h1
+                        class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+                        Smart Expense</h1>
+                    <p class="text-sm text-gray-500 font-medium">AI-Powered Tracker</p>
+                </div>
+            </div>
+
+            <!-- AUTH & ACTIONS -->
+            <div class="flex items-center gap-3 flex-wrap justify-center">
+                <div id="welcomeText" class="hidden text-sm font-medium text-gray-600 mr-2 flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span id="userEmailDisplay"></span>
+                </div>
+
+                <button id="showLogin"
+                    class="btn-hover px-5 py-2.5 bg-white text-indigo-600 font-medium border border-indigo-100 rounded-xl hover:bg-indigo-50 transition-colors">Login</button>
+                <button id="showSignup"
+                    class="btn-hover px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-xl shadow-md hover:bg-indigo-700 transition-colors">Sign
+                    Up</button>
+
+                <button id="viewDbBtn"
+                    class="hidden btn-hover px-4 py-2.5 bg-white text-gray-700 font-medium border border-gray-200 rounded-xl flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4">
+                        </path>
+                    </svg>
+                    Database
+                </button>
+                <button id="logoutBtn"
+                    class="hidden btn-hover px-4 py-2.5 bg-red-50 text-red-600 font-medium border border-red-100 rounded-xl hover:bg-red-100 transition-colors">Logout</button>
+            </div>
+        </header>
+
+        <!-- DASHBOARD GRID -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+            <!-- LEFT COLUMN: ADD EXPENSE & QUICK STATS -->
+            <div class="lg:col-span-5 space-y-6">
+
+                <!-- Quick Stats summary card -->
+                <div class="glass-panel p-6 rounded-2xl flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 mb-1">Total This Month</p>
+                        <p id="monthlyTotal" class="text-4xl font-bold text-gray-900 tracking-tight">₹0</p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Add Expense Form -->
+                <div class="glass-panel p-6 sm:p-8 rounded-2xl relative overflow-hidden">
+                    <!-- decorative gradient blob -->
+                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500 opacity-10 rounded-full blur-2xl">
+                    </div>
+
+                    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4">
+                            </path>
+                        </svg>
+                        Add New Expense
+                    </h2>
+
+                    <form id="expenseForm" class="space-y-5 relative z-10">
+                        <div>
+                            <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-gray-500 font-medium">₹</span>
+                                </div>
+                                <input type="number" id="amount" step="0.01"
+                                    class="pl-8 block w-full rounded-xl border-gray-200 bg-gray-50 py-3 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors sm:text-sm"
+                                    placeholder="0.00" required />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="description"
+                                class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                            <input type="text" id="description"
+                                class="block w-full rounded-xl border-gray-200 bg-gray-50 py-3 px-4 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors sm:text-sm"
+                                placeholder="e.g. Starbucks Coffee" required />
+                        </div>
+
+                        <div>
+                            <label for="date" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                            <input type="date" id="date"
+                                class="block w-full rounded-xl border-gray-200 bg-gray-50 py-3 px-4 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors sm:text-sm text-gray-700"
+                                required />
+                        </div>
+
+                        <!-- AI Processing indicator -->
+                        <div id="aiProcessing"
+                            class="hidden bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center gap-3">
+                            <div class="relative flex h-4 w-4">
+                                <span
+                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-4 w-4 bg-indigo-500"></span>
+                            </div>
+                            <span class="text-sm font-medium text-indigo-800">Analyzing expense...</span>
+                        </div>
+
+                        <button id="submitBtn" type="submit"
+                            class="btn-hover w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform">
+                            Add & Categorize
+                        </button>
+                    </form>
+
+                    <!-- AI Category Suggestion Result -->
+                    <div id="aiCategoryResult"
+                        class="hidden mt-6 p-5 bg-green-50/80 border border-green-200 rounded-xl backdrop-blur-sm">
+                        <div class="flex items-start gap-4 mb-4">
+                            <div class="bg-white p-2.5 rounded-full shadow-sm">
+                                <span class="text-xl">✨</span>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-semibold text-green-900 mb-1">Suggested Category</h3>
+                                <p id="aiCategory"
+                                    class="text-xl font-bold text-green-700 bg-white inline-block px-3 py-1 rounded-lg shadow-sm">
+                                </p>
+                            </div>
+                        </div>
+                        <button id="confirmCategory"
+                            class="btn-hover w-full py-2.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            Confirm and Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: CHARTS & LISTS -->
+            <div class="lg:col-span-7 space-y-6">
+                <!-- Data Vis Card -->
+                <div class="glass-panel p-6 sm:p-8 rounded-2xl h-full flex flex-col">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                        </svg>
+                        Spending Breakdown
+                    </h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 flex-grow">
+                        <!-- Chart -->
+                        <div class="chart-container flex items-center justify-center">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+
+                        <!-- Mini category list (Top 5) -->
+                        <div class="flex flex-col justify-center">
+                            <h3 class="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">Top Categories
+                            </h3>
+                            <div id="categoryList" class="space-y-3">
+                                <!-- Populated dynamically -->
+                                <p class="text-sm text-gray-400 italic" id="emptyChartState">Add expenses to see
+                                    breakdown</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- End top grid -->
+
+        <!-- FULL EXPENSE TABLE AREA -->
+        <div class="mt-8 glass-panel rounded-2xl overflow-hidden shadow-sm">
+
+            <!-- Table Header & Filters -->
+            <div
+                class="p-6 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white/50">
+                <h2 class="text-xl font-bold text-gray-800">Recent Transactions</h2>
+
+                <div class="flex items-center gap-3 w-full sm:w-auto">
+                    <div class="relative w-full sm:w-48">
+                        <select id="filterSelect"
+                            class="appearance-none block w-full bg-white border border-gray-200 text-gray-700 py-2.5 px-4 pr-8 rounded-xl leading-tight focus:outline-none focus:bg-white focus:border-indigo-500 sm:text-sm font-medium">
+                            <option value="">All Time</option>
+                            <option value="month">This Month</option>
+                            <option value="6months">Last 6 Months</option>
+                            <option value="year">This Year</option>
+                            <option value="2years">Last 2 Years</option>
+                        </select>
+                        <div
+                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table content -->
+            <div class="p-0 sm:p-2 bg-white/40">
+                <table class="responsive-table">
+                    <thead>
+                        <tr>
+                            <th class="text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-lg">Date
+                            </th>
+                            <th class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
+                            <th class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
+                            <th class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th class="text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-lg">
+                                Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenseTableBody">
+                        <!-- Intentionally empty for loading -->
+                        <tr>
+                            <td colspan="5" class="text-center py-8 text-gray-400 text-sm">Loading expenses...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div> <!-- End Main Container -->
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('loginModal')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+            <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">Welcome Back</h3>
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="loginEmail"
+                        class="block w-full rounded-xl border-gray-200 bg-gray-50 py-3 px-4 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="you@example.com" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="loginPassword"
+                        class="block w-full rounded-xl border-gray-200 bg-gray-50 py-3 px-4 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="••••••••" required>
+                </div>
+                <button type="submit"
+                    class="w-full py-3 mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl btn-hover">Sign
+                    In</button>
+                <p class="text-center text-sm text-gray-500 mt-4">Don't have an account? <a href="#"
+                        class="text-indigo-600 font-medium hover:underline"
+                        onclick="closeModal('loginModal'); openModal('signupModal'); return false;">Sign up</a></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Signup Modal -->
+    <div id="signupModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('signupModal')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+            <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">Create Account</h3>
+            <form id="signupForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input type="text" id="signupName"
+                        class="block w-full rounded-xl border-gray-200 bg-gray-50 py-3 px-4 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="John Doe">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="signupEmail"
+                        class="block w-full rounded-xl border-gray-200 bg-gray-50 py-3 px-4 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="you@example.com" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="signupPassword"
+                        class="block w-full rounded-xl border-gray-200 bg-gray-50 py-3 px-4 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="••••••••" required>
+                </div>
+                <button type="submit"
+                    class="w-full py-3 mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl btn-hover">Create
+                    Account</button>
+                <p class="text-center text-sm text-gray-500 mt-4">Already have an account? <a href="#"
+                        class="text-indigo-600 font-medium hover:underline"
+                        onclick="closeModal('signupModal'); openModal('loginModal'); return false;">Log in</a></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- DB Modal -->
+    <div id="dbModal" class="modal-overlay">
+        <div class="modal-content !bg-gray-50">
+            <button class="modal-close bg-white rounded-full p-1 shadow hover:bg-gray-100"
+                onclick="closeModal('dbModal')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+            <div class="flex items-center gap-3 mb-6 font-bold text-xl text-gray-800 shrink-0">
+                <svg class="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4">
+                    </path>
+                </svg>
+                Raw Database View
+            </div>
+
+            <div class="table-container bg-white rounded-xl shadow-sm border border-gray-100 p-2">
+                <table class="responsive-table w-full text-sm">
+                    <thead>
+                        <tr>
+                            <th class="text-gray-500 font-medium bg-gray-50/50">Date</th>
+                            <th class="text-gray-500 font-medium bg-gray-50/50">Description</th>
+                            <th class="text-gray-500 font-medium bg-gray-50/50">Category</th>
+                            <th class="text-gray-500 font-medium bg-gray-50/50">Amount (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dbModalTableBody">
+                        <!-- Data inserted here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-gray-200 text-right shrink-0">
+                <button onclick="closeModal('dbModal')"
+                    class="px-5 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-800 font-medium transition-colors">Close
+                    View</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ==================== SCRIPTS ==================== -->
+    <script>
+        // CONFIG
+        // Determine base URL dynamically if deployed, otherwise fallback to local for dev
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? "http://127.0.0.1:5000"
+            : "";
+
+        // Set default date to today
+        document.getElementById('date').valueAsDate = new Date();
+
+        // -------------------------
+        // UI Helpers
+        // -------------------------
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            const icon = type === 'success'
+                ? `<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`
+                : `<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+
+            toast.innerHTML = `${icon}<span class="font-medium text-gray-800 text-sm">${message}</span>`;
+
+            container.appendChild(toast);
+
+            // Animate in
+            requestAnimationFrame(() => toast.classList.add('show'));
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+            if (id === 'loginModal') document.getElementById('loginForm').reset();
+            if (id === 'signupModal') document.getElementById('signupForm').reset();
+        }
+
+        // Close modals on outside click
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal(modal.id);
+            });
+        });
+
+        // -------------------------
+        // State & Logic
+        // -------------------------
+
+        let CATEGORIES = [];
+        let categoryChart = null;
+
+        async function fetchCategories() {
+            try {
+                const res = await fetch(API_BASE + "/categories");
+                if (res.ok) CATEGORIES = await res.json();
+            } catch (e) {
+                console.error("Categories fetch failed", e);
+                // Fallback safe categories
+                CATEGORIES = [
+                    { "id": 1, "name": "Food", "color": "#6366F1" },
+                    { "id": 2, "name": "Transport", "color": "#10B981" },
+                    { "id": 3, "name": "Entertainment", "color": "#F59E0B" },
+                    { "id": 4, "name": "Shopping", "color": "#EC4899" },
+                    { "id": 5, "name": "Utilities", "color": "#3B82F6" },
+                    { "id": 6, "name": "Health", "color": "#EF4444" },
+                    { "id": 7, "name": "Other", "color": "#64748B" }
+                ];
+            }
+        }
+
+        function initChart() {
+            Chart.defaults.font.family = "'Outfit', sans-serif";
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            categoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 0, hoverOffset: 4 }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(17, 24, 39, 0.9)',
+                            padding: 12,
+                            titleFont: { size: 14, weight: 'bold' },
+                            bodyFont: { size: 13 },
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function (context) {
+                                    return ` ₹${context.raw.toLocaleString('en-IN')}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function formatINR(n) {
+            return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function updateMonthlyTotal(expenses) {
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
+            const monthlyTotal = expenses
+                .filter(e => {
+                    const d = new Date(e.date);
+                    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                })
+                .reduce((acc, e) => acc + e.amount, 0);
+            document.getElementById('monthlyTotal').textContent = `₹${formatINR(monthlyTotal)}`;
+        }
+
+        function updateChart(expenses) {
+            if (expenses.length === 0) {
+                categoryChart.data.labels = ['No Data'];
+                categoryChart.data.datasets[0].data = [1];
+                categoryChart.data.datasets[0].backgroundColor = ['#E5E7EB'];
+                categoryChart.update();
+                document.getElementById('emptyChartState').style.display = 'block';
+                document.getElementById('categoryList').innerHTML = `<p class="text-sm text-gray-400 italic" id="emptyChartState">Add expenses to see breakdown</p>`;
+                return;
+            }
+
+            const totals = {};
+            const colors = {};
+            CATEGORIES.forEach(c => { totals[c.name] = 0; colors[c.name] = c.color; });
+            expenses.forEach(e => {
+                const cat = e.category || "Other";
+                if (!(cat in totals)) totals[cat] = 0;
+                totals[cat] += e.amount;
+            });
+            const labels = [], data = [], bg = [];
+            Object.entries(totals).forEach(([k, v]) => {
+                if (v > 0) { labels.push(k); data.push(v); bg.push(colors[k] || "#cbd5e1"); }
+            });
+
+            categoryChart.data.labels = labels;
+            categoryChart.data.datasets[0].data = data;
+            categoryChart.data.datasets[0].backgroundColor = bg;
+            categoryChart.update();
+
+            // Update mini list
+            const list = document.getElementById('categoryList');
+            list.innerHTML = "";
+            const sorted = Object.entries(totals).filter(([_, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+
+            sorted.slice(0, 5).forEach(([name, amt]) => {
+                const cat = CATEGORIES.find(c => c.name === name) || { color: "#cbd5e1" };
+                const el = document.createElement('div');
+                el.className = 'flex items-center justify-between p-3 bg-white rounded-xl shadow-sm border border-gray-50';
+                el.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="category-color" style="background-color:${cat.color}"></span>
+                        <span class="font-medium text-gray-700 text-sm whitespace-nowrap">${name}</span>
+                    </div>
+                    <span class="font-bold text-gray-900 text-sm">₹${formatINR(amt)}</span>
+                `;
+                list.appendChild(el);
+            });
+        }
+
+        function updateExpenseTable(expenses) {
+            const tbody = document.getElementById('expenseTableBody');
+            tbody.innerHTML = "";
+
+            if (expenses.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 font-medium text-gray-500">No expenses recorded yet.</td></tr>`;
+                return;
+            }
+
+            const sorted = expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+            sorted.forEach(e => {
+                const catColor = (CATEGORIES.find(c => c.name === e.category) || { color: '#94a3b8' }).color;
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="font-medium text-gray-600 sm:w-32" data-label="Date">${new Date(e.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                    <td class="text-gray-800 font-medium" data-label="Description">${e.description || '-'}</td>
+                    <td data-label="Category">
+                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm" style="background-color: ${catColor}15; color: ${catColor}; border: 1px solid ${catColor}30">
+                            ${e.category || "Other"}
+                        </span>
+                    </td>
+                    <td class="font-bold text-gray-900 whitespace-nowrap" data-label="Amount">₹${formatINR(e.amount)}</td>
+                    <td class="whitespace-nowrap sm:w-24 text-right sm:text-left" data-label="Action">
+                        <button class="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors" onclick="handleDelete('${e.id}')" title="Delete">
+                            <svg class="w-5 h-5 mx-auto sm:mx-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function loadExpenses() {
+            const user_id = localStorage.getItem("user_id");
+            if (!user_id) {
+                updateMonthlyTotal([]);
+                updateChart([]);
+                updateExpenseTable([]);
+                return;
+            }
+
+            // Loading state
+            document.getElementById('expenseTableBody').innerHTML = `<tr><td colspan="5" class="text-center py-8 text-indigo-500"><svg class="animate-spin h-6 w-6 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></td></tr>`;
+
+            const filter = document.getElementById('filterSelect').value;
+            const url = `${API_BASE}/get_expenses/${user_id}` + (filter ? `?filter=${filter}` : '');
+
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    const expenses = await res.json();
+                    updateMonthlyTotal(expenses);
+                    updateChart(expenses);
+                    updateExpenseTable(expenses);
+                } else {
+                    showToast("Failed to load records", "error");
+                }
+            } catch (e) {
+                console.error(e);
+                showToast("Server connection error", "error");
+            }
+        }
+
+        async function handleDelete(id) {
+            if (!confirm("Delete this expense permanently?")) return;
+            try {
+                const res = await fetch(`${API_BASE}/delete_expense/${id}`, { method: "DELETE" });
+                if (res.ok) {
+                    showToast("Expense deleted");
+                    await loadExpenses();
+                } else {
+                    const j = await res.json();
+                    showToast(j.error || "Delete failed", "error");
+                }
+            } catch (e) {
+                showToast("Connection error", "error");
+            }
+        }
+
+        // Logic AI
+        function categorizeExpense(description) {
+            const lower = description.toLowerCase();
+            if (lower.match(/food|restaurant|cafe|groceries|snack|coffee|dining|pizza|burger/)) return "Food";
+            if (lower.match(/rent|apartment|hotel|mortgage|utility|electricity|water|maintenance/)) return "Housing";
+            if (lower.match(/travel|flight|bus|taxi|uber|train|fuel|petrol|diesel|car|ola|metro/)) return "Transport"; // mapped to DB "Transport" instead of "Travel"
+            if (lower.match(/doctor|hospital|medicine|gym|fitness|clinic|health|pharmacy/)) return "Health";
+            if (lower.match(/movie|cinema|game|netflix|spotify|music|entertainment|amusement/)) return "Entertainment";
+            if (lower.match(/books|course|tuition|class|study|learning|school|college/)) return "Education";
+            if (lower.match(/clothes|shoes|cosmetics|shopping|accessories|care|amazon|flipkart|myntra/)) return "Shopping";
+            if (lower.match(/internet|mobile|subscription|bill|prime|wifi|recharge/)) return "Utilities"; // Mapped to Utility
+            if (lower.match(/investment|fund|stocks|savings|insurance|crypto|sip/)) return "Investment";
+            if (lower.match(/gift|donation|charity|support/)) return "Gifts & Donations";
+            return "Other";
+        }
+
+        // ADD EXPENSE FLOW
+        document.getElementById('expenseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amountInput = document.getElementById('amount');
+            const descriptionInput = document.getElementById('description');
+            const dateInput = document.getElementById('date');
+
+            const amount = parseFloat(amountInput.value);
+            const description = descriptionInput.value.trim();
+            const date = dateInput.value;
+
+            if (!amount || !description || !date) {
+                showToast("Please fill all fields", "error");
+                return;
+            }
+
+            const user_id = localStorage.getItem("user_id");
+            if (!user_id) {
+                openModal('loginModal');
+                showToast("Please log in first", "error");
+                return;
+            }
+
+            const btn = document.getElementById('submitBtn');
+            const originalBtnText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "Analyzing...";
+            btn.classList.add('opacity-70');
+
+            const aiProcessing = document.getElementById('aiProcessing');
+            aiProcessing.classList.remove('hidden');
+
+            // Fake AI delay
+            await new Promise(r => setTimeout(r, 800));
+            const aiCategory = categorizeExpense(description);
+
+            aiProcessing.classList.add('hidden');
+            btn.innerText = originalBtnText;
+            btn.disabled = false;
+            btn.classList.remove('opacity-70');
+
+            const aiCategoryResult = document.getElementById('aiCategoryResult');
+            document.getElementById('aiCategory').textContent = aiCategory;
+            aiCategoryResult.classList.remove('hidden');
+
+            // Scroll down slightly so user sees it
+            aiCategoryResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            const confirmBtn = document.getElementById('confirmCategory');
+            // Clean up old listeners
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+
+            newConfirmBtn.onclick = async () => {
+                newConfirmBtn.disabled = true;
+                newConfirmBtn.innerText = "Saving...";
+
+                try {
+                    const res = await fetch(API_BASE + "/add_expense", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ user_id: parseInt(user_id), amount, description, category: aiCategory, date })
+                    });
+
+                    if (res.ok) {
+                        showToast("Added successfully!");
+                        amountInput.value = "";
+                        descriptionInput.value = "";
+                        // Keep date as is for convenience
+
+                        aiCategoryResult.classList.add('hidden');
+                        await loadExpenses();
+                    } else {
+                        throw new Error("Failed to save");
+                    }
+                } catch (err) {
+                    showToast(err.message || "Server Error", "error");
+                } finally {
+                    newConfirmBtn.disabled = false;
+                    newConfirmBtn.innerText = "Confirm and Save";
+                }
+            };
+        });
+
+
+        // AUTH FLOW
+        document.getElementById("showLogin").addEventListener("click", () => openModal('loginModal'));
+        document.getElementById("showSignup").addEventListener("click", () => openModal('signupModal'));
+
+        document.getElementById("loginForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const email = document.getElementById("loginEmail").value;
+            const password = document.getElementById("loginPassword").value;
+            const btn = e.target.querySelector('button');
+            const ogText = btn.innerText;
+            btn.innerText = "Checking...";
+
+            try {
+                const res = await fetch(API_BASE + "/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, password })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem("user_id", data.user_id);
+                    localStorage.setItem("user_email", email);
+                    setLoggedInUI(email);
+                    closeModal('loginModal');
+                    showToast("Welcome back!");
+                    await loadExpenses();
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || "Login failed", "error");
+                }
+            } catch (err) {
+                showToast("Network error", "error");
+            } finally {
+                btn.innerText = ogText;
+            }
+        });
+
+        document.getElementById("signupForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const name = document.getElementById("signupName").value;
+            const email = document.getElementById("signupEmail").value;
+            const password = document.getElementById("signupPassword").value;
+            const btn = e.target.querySelector('button');
+            const ogText = btn.innerText;
+            btn.innerText = "Creating...";
+
+            try {
+                const res = await fetch(API_BASE + "/signup", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name, email, password })
+                });
+                if (res.ok) {
+                    showToast("Account created! Please log in.");
+                    closeModal('signupModal');
+                    openModal('loginModal');
+                    document.getElementById('loginEmail').value = email;
+                    document.getElementById('loginPassword').focus();
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || "Signup failed", "error");
+                }
+            } catch (e) {
+                showToast("Network error", "error");
+            } finally {
+                btn.innerText = ogText;
+            }
+        });
+
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            localStorage.removeItem("user_id");
+            localStorage.removeItem("user_email");
+            setLoggedOutUI();
+            updateMonthlyTotal([]);
+            updateChart([]);
+            updateExpenseTable([]);
+            showToast("Logged out successfully");
+            document.getElementById('aiCategoryResult').classList.add('hidden');
+        });
+
+        function setLoggedInUI(email) {
+            document.getElementById("userEmailDisplay").textContent = email;
+            document.getElementById("welcomeText").classList.remove("hidden");
+            document.getElementById("showLogin").classList.add("hidden");
+            document.getElementById("showSignup").classList.add("hidden");
+            document.getElementById("logoutBtn").classList.remove("hidden");
+            document.getElementById("viewDbBtn").classList.remove("hidden");
+        }
+
+        function setLoggedOutUI() {
+            document.getElementById("welcomeText").classList.add("hidden");
+            document.getElementById("showLogin").classList.remove("hidden");
+            document.getElementById("showSignup").classList.remove("hidden");
+            document.getElementById("logoutBtn").classList.add("hidden");
+            document.getElementById("viewDbBtn").classList.add("hidden");
+        }
+
+        // DB View
+        document.getElementById('viewDbBtn').addEventListener('click', async () => {
+            const user_id = localStorage.getItem("user_id");
+            if (!user_id) return;
+            const tbody = document.getElementById('dbModalTableBody');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4">Loading...</td></tr>';
+            openModal('dbModal');
+
+            try {
+                const res = await fetch(`${API_BASE}/get_expenses/${user_id}`);
+                if (res.ok) {
+                    const expenses = await res.json();
+                    tbody.innerHTML = "";
+                    if (expenses.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">No data found in DB.</td></tr>`;
+                    } else {
+                        expenses.forEach(e => {
+                            tbody.innerHTML += `
+                                <tr class="hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                                    <td class="p-3" data-label="Date">${new Date(e.date).toISOString().split('T')[0]}</td>
+                                    <td class="p-3" data-label="Description">${e.description || '-'}</td>
+                                    <td class="p-3" data-label="Category">${e.category || 'Other'}</td>
+                                    <td class="p-3 font-mono font-bold" data-label="Amount">₹${e.amount}</td>
+                                </tr>
+                            `;
+                        });
+                    }
+                }
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-500">Error fetching raw data.</td></tr>`;
+            }
+        });
+
+        // Filter Dropdown
+        document.getElementById("filterSelect").addEventListener("change", loadExpenses);
+
+        // INIT
+        (async () => {
+            await fetchCategories();
+            initChart();
+            if (localStorage.getItem("user_id")) {
+                setLoggedInUI(localStorage.getItem("user_email"));
+                await loadExpenses();
+            } else {
+                setLoggedOutUI();
+                updateChart([]); // draw empty chart
+            }
+        })();
+    </script>
+</body>
+
+</html>
