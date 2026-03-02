@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/signup",
+      "dest": "app.py"
+    },
+    {
+      "src": "/login",
+      "dest": "app.py"
+    },
+    {
+      "src": "/add_expense",
+      "dest": "app.py"
+    },
+    {
+      "src": "/delete_expense/(.*)",
+      "dest": "app.py"
+    },
+    {
+      "src": "/get_expenses/(.*)",
+      "dest": "app.py"
+    },
+    {
+      "src": "/categories",
+      "dest": "app.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/$1"
+    },
+    {
+      "src": "/",
+      "dest": "frontend/index.html"
+    }
+  ]
+}
